@@ -61,6 +61,7 @@ Required JSON:
 }
 """
 
+
 FUNDAMENTAL_SCHEMA = {
     "type": "OBJECT",
     "properties": {
@@ -159,14 +160,12 @@ on the information above.
 """
 
     result = client.chat_json(
-    SYSTEM_PROMPT,
-    user_prompt,
-    response_schema=FundamentalResult,
-    temperature=0.2,
-    max_tokens=2500,
-)
-
-return FundamentalResult(**result)
+        SYSTEM_PROMPT,
+        user_prompt,
+        response_schema=FUNDAMENTAL_SCHEMA,
+        temperature=0.2,
+        max_tokens=2500,
+    )
 
     # Basic validation before constructing the Pydantic model.
     score_fields = [
