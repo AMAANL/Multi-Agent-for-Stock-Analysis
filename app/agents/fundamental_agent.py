@@ -159,12 +159,14 @@ on the information above.
 """
 
     result = client.chat_json(
-        SYSTEM_PROMPT,
-        user_prompt,
-        response_schema=FUNDAMENTAL_SCHEMA,
-        temperature=0.2,
-        max_tokens=1200,
-    )
+    SYSTEM_PROMPT,
+    user_prompt,
+    response_schema=FundamentalResult,
+    temperature=0.2,
+    max_tokens=2500,
+)
+
+return FundamentalResult(**result)
 
     # Basic validation before constructing the Pydantic model.
     score_fields = [
