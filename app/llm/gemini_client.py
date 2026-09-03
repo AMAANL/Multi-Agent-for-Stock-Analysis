@@ -76,7 +76,7 @@ class GeminiClient:
             **config_kwargs
         )
 
-        # Retry temporary Gemini availability errors.
+        # Retry only temporary Gemini availability errors.
         max_retries = 3
 
         for attempt in range(max_retries):
@@ -87,7 +87,7 @@ class GeminiClient:
                     config=config,
                 )
 
-                # Debug information. Useful while developing.
+                # Debug information.
                 if (
                     hasattr(response, "candidates")
                     and response.candidates
@@ -127,21 +127,37 @@ class GeminiClient:
 
             except Exception as e:
                 error_text = str(e)
+                error_upper = error_text.upper()
 
-                # Gemini can temporarily return 503 when the
-                # selected model is under heavy load.
+                # -------------------------------------------------
+                # 429 - Quota exceeded
+                # -------------------------------------------------
+                if (
+                    "429" in error_text
+                    or "RESOURCE_EXHAUSTED" in error_upper
+                ):
+                    raise RuntimeError(
+                        "Gemini API quota exceeded.\n\n"
+                        f"The free-tier request limit for "
+                        f"{self.model} has been reached.\n\n"
+                        "Please wait for the quota to reset or "
+                        "use a Gemini API project with billing enabled."
+                    ) from e
+
+                # -------------------------------------------------
+                # 503 - Temporary service unavailability
+                # -------------------------------------------------
                 is_temporary = (
                     "503" in error_text
-                    or "UNAVAILABLE" in error_text.upper()
+                    or "UNAVAILABLE" in error_upper
                 )
 
-                # If this is not a temporary error, fail immediately.
                 if not is_temporary:
                     raise RuntimeError(
                         f"Gemini API request failed: {e}"
                     ) from e
 
-                # Last attempt failed.
+                # Last retry failed.
                 if attempt == max_retries - 1:
                     raise RuntimeError(
                         "Gemini is temporarily unavailable "
