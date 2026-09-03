@@ -20,10 +20,9 @@ from app.models.schemas import (
 
 SYSTEM_PROMPT = """You are an equity research analyst assistant.
 
-You will be given a company's profile and its raw financial numbers.
+You will be given a company's profile and raw financial numbers.
 
 Score the business on:
-
 - business_quality
 - growth
 - competitive_advantage
@@ -32,15 +31,35 @@ Score the business on:
 
 Each score must be between 0 and 10.
 
-Rules:
-- Use only the information provided.
-- Do not invent financial numbers.
-- Do not claim facts that are not supported by the provided information.
-- Risks must contain 3-6 concise strings.
-- Summary must contain 2-4 sentences.
-- Return ONLY JSON.
-"""
+Provide exactly 4 concise risks.
+Each risk must be one short sentence.
 
+Provide a concise summary of 2-3 sentences.
+
+IMPORTANT:
+- Use ONLY the information provided.
+- Do not invent financial numbers.
+- Do not add extra fields.
+- Keep the response short.
+- Respond ONLY with valid JSON.
+- Do not use markdown or code fences.
+
+Required JSON:
+{
+  "business_quality": 0,
+  "growth": 0,
+  "competitive_advantage": 0,
+  "management": 0,
+  "industry_position": 0,
+  "risks": [
+    "...",
+    "...",
+    "...",
+    "..."
+  ],
+  "summary": "..."
+}
+"""
 
 FUNDAMENTAL_SCHEMA = {
     "type": "OBJECT",
@@ -144,7 +163,7 @@ on the information above.
         user_prompt,
         response_schema=FUNDAMENTAL_SCHEMA,
         temperature=0.2,
-        max_tokens=2500,
+        max_tokens=1200,
     )
 
     # Basic validation before constructing the Pydantic model.
