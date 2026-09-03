@@ -8,17 +8,20 @@ Supports:
     - Normal text responses
     - Structured JSON responses
     - Gemini response schemas
+    - Automatic retry for temporary Gemini errors
 """
 
 from __future__ import annotations
 
 import json
 import os
+import time
 from typing import Any, Dict, Optional
 
 from dotenv import load_dotenv
 from google import genai
 from google.genai import types
+
 
 load_dotenv()
 
@@ -73,39 +76,95 @@ class GeminiClient:
             **config_kwargs
         )
 
-        try:
-            response = self.client.models.generate_content(
-                model=self.model,
-                contents=user_prompt,
-                config=config,
-            )
+        # Retry temporary Gemini availability errors.
+        max_retries = 3
 
-            # Debug information. Useful while developing.
-            if hasattr(response, "candidates") and response.candidates:
-                candidate = response.candidates[0]
-
-                finish_reason = getattr(
-                    candidate,
-                    "finish_reason",
-                    None,
+        for attempt in range(max_retries):
+            try:
+                response = self.client.models.generate_content(
+                    model=self.model,
+                    contents=user_prompt,
+                    config=config,
                 )
 
-                if finish_reason:
-                    print(
-                        f"[Gemini] Finish reason: {finish_reason}"
+                # Debug information. Useful while developing.
+                if (
+                    hasattr(response, "candidates")
+                    and response.candidates
+                ):
+                    candidate = response.candidates[0]
+
+                    finish_reason = getattr(
+                        candidate,
+                        "finish_reason",
+                        None,
                     )
 
-            if not response.text:
-                raise RuntimeError(
-                    "Gemini returned an empty response."
+                    if finish_reason:
+                        print(
+                            f"[Gemini] Finish reason: "
+                            f"{finish_reason}"
+                        )
+
+                    token_count = getattr(
+                        candidate,
+                        "token_count",
+                        None,
+                    )
+
+                    if token_count:
+                        print(
+                            f"[Gemini] Token count: "
+                            f"{token_count}"
+                        )
+
+                if not response.text:
+                    raise RuntimeError(
+                        "Gemini returned an empty response."
+                    )
+
+                return response.text
+
+            except Exception as e:
+                error_text = str(e)
+
+                # Gemini can temporarily return 503 when the
+                # selected model is under heavy load.
+                is_temporary = (
+                    "503" in error_text
+                    or "UNAVAILABLE" in error_text.upper()
                 )
 
-            return response.text
+                # If this is not a temporary error, fail immediately.
+                if not is_temporary:
+                    raise RuntimeError(
+                        f"Gemini API request failed: {e}"
+                    ) from e
 
-        except Exception as e:
-            raise RuntimeError(
-                f"Gemini API request failed: {e}"
-            ) from e
+                # Last attempt failed.
+                if attempt == max_retries - 1:
+                    raise RuntimeError(
+                        "Gemini is temporarily unavailable "
+                        "because the model is experiencing "
+                        "high demand. Please try again later."
+                    ) from e
+
+                # Exponential backoff:
+                # attempt 0 -> 2 seconds
+                # attempt 1 -> 4 seconds
+                wait_time = 2 ** (attempt + 1)
+
+                print(
+                    f"[Gemini] Temporary 503/UNAVAILABLE error. "
+                    f"Retrying in {wait_time}s "
+                    f"(attempt {attempt + 1}/{max_retries})..."
+                )
+
+                time.sleep(wait_time)
+
+        raise RuntimeError(
+            "Gemini API request failed after retries."
+        )
 
     def chat_json(
         self,
