@@ -175,11 +175,23 @@ if submitted:
         # ---------------------------------------------
 
         status.write("📊 Fetching market data...")
-        df = get_ohlcv(
-            ticker=ticker,
-            timeframe=timeframe,
-            period=period,
-        )
+
+        try:
+            df = get_ohlcv(
+                ticker=ticker,
+                timeframe=timeframe,
+                period=period,
+            )
+        
+        except ValueError:
+            st.error(
+                f"❌ Invalid stock ticker: **{ticker}**\n\n"
+                "No market data was found for this ticker. "
+                "Please enter a valid Yahoo Finance ticker, "
+                "for example `RELIANCE.NS`, `TCS.NS`, or `SUZLON.NS`."
+            )
+        
+            st.stop()
 
         progress.progress(20)
 
